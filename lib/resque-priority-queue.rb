@@ -1,1 +1,1 @@
-require File.expand_path('resque/priority/priority_queue', File.dirname(__FILE__))
+require File.expand_path('resque/plugins/priority_queue', File.dirname(__FILE__))
