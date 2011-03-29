@@ -77,6 +77,31 @@ module Resque
           end
         end
 
+      # the priority value has to be a number between 0 and 1000
+        # for the queue to work right, the lower the number actually has to map to the higher priority, so
+        # we return 1000 minus the priority.  here we also convert certain symbols to numeric values
+        def clean_priority(sym)
+
+          cleaned_priority = if sym.is_a? Symbol
+            case sym
+              when :highest
+                1000
+              when :normal
+                500
+              when :lowest
+                0
+              else
+                0
+            end
+          else
+            # make it an integer between 0 and 1000
+            [[sym.to_i, 1000].min, 0].max rescue 0
+          end
+
+          1000 - cleaned_priority
+
+        end
+
         protected
 
         def pop_priority(queue)
@@ -103,32 +128,6 @@ module Resque
           end
           
         end
-
-        # the priority value has to be a number between 0 and 1000
-        # for the queue to work right, the lower the number actually has to map to the higher priority, so
-        # we return 1000 minus the priority.  here we also convert certain symbols to numeric values
-        def clean_priority(sym)
-          
-          cleaned_priority = if sym.is_a? Symbol
-            case sym
-              when :highest
-                1000
-              when :normal
-                500
-              when :lowest
-                0
-              else
-                0
-            end
-          else
-            # make it an integer between 0 and 1000
-            [[sym.to_i, 1000].min, 0].max rescue 0
-          end
-
-          1000 - cleaned_priority
-
-        end
-
         
       end
 
