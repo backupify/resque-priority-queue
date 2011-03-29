@@ -61,4 +61,30 @@ class JobTest < Test::Unit::TestCase
 
   end
 
+  def test_size
+    # size should work with both zsets and lists
+
+    7.times { |i| Resque.push_with_priority(:priority_jobs_3, { :class => SomePriorityJob, :args => [ "#{i}" ] }, i) }
+    9.times { |i| Resque.push(:non_priority_jobs_3, { :class => SomeNonPriorityJob, :args => ["#{i}"] })}
+
+    assert_equal 7, Resque.size(:priority_jobs_3)
+    assert_equal 9, Resque.size(:non_priority_jobs_3)
+  end
+
+  def test_sym_to_priority
+
+    assert_equal 100, Resque.send(:sym_to_priority, :high)
+    assert_equal 50, Resque.send(:sym_to_priority, :normal)
+    assert_equal 0, Resque.send(:sym_to_priority, :low)
+
+    assert_equal 9999, Resque.send(:sym_to_priority, 9999)
+    assert_equal 7777, Resque.send(:sym_to_priority, '7777')
+    assert_equal 3.14, Resque.send(:sym_to_priority, 3.14)
+    assert_equal 6, Resque.send(:sym_to_priority, '6.28')
+
+    assert_equal 0, Resque.send(:sym_to_priority, nil)
+    assert_equal 0, Resque.send(:sym_to_priority, Hash.new)
+
+  end
+
 end

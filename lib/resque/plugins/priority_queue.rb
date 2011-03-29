@@ -3,7 +3,7 @@ module Resque
     module PriorityQueue
 
       def self.enable!(options={})
-        return if Resque::Job.is_a?(Resque::Plugins::PriorityQueue::JobMethods)
+        return if @priority_queue_enabled
 
         compat = options[:compat] || []
         compat = [compat] unless compat.is_a?(Array)
@@ -27,6 +27,8 @@ module Resque
 
         Resque::Job.send(:extend, JobMethods)
         Resque::Job.send(:include, JobMethods)
+
+        @priority_queue_enabled = true
       end
 
       module ResqueMethods
