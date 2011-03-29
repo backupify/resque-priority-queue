@@ -22,6 +22,9 @@ module Resque
           alias_method :size_sequential, :size
           alias_method :size, :_size
 
+          alias_method :peek_sequential, :peek
+          alias_method :peek, :_peek
+
           extend self
         end
 
@@ -39,47 +42,50 @@ module Resque
 
         def push_with_priority(queue, item, priority = :normal)
           watch_queue(queue)
-          redis.zadd "queue:#{queue}", sym_to_priority(priority), encode(item)
+          redis.zadd "queue:#{queue}", clean_priority(priority), encode(item)
         end
 
         def _pop(queue)
-          case Resque.redis.type "queue:#{queue}"
-            when 'zset'
-              pop_priority(queue)
-            else
-              pop_sequential(queue)
+          if is_priority_queue?(queue)
+            pop_priority(queue)
+          else
+            pop_sequential(queue)
           end
         end
 
         def _size(queue)
-          case Resque.redis.type "queue:#{queue}"
-            when 'zset'
-              size_priority(queue)
-            else
-              size_sequential(queue)
+          if is_priority_queue?(queue)
+            size_priority(queue)
+          else
+            size_sequential(queue)
           end
-
         end
 
         def _push(queue, item)
-          case Resque.redis.type "queue:#{queue}"
-            when 'zset'
-              push_with_priority(queue, item)
-            else
-              push_sequential(queue, item)
+          if is_priority_queue?(queue)
+            push_with_priority(queue, item)
+          else
+            push_sequential(queue, item)
           end
-        end          
+        end
+
+        def _peek(queue, start=0, count=1)
+          if is_priority_queue?(queue)
+            peek_priority(queue, start, count)
+          else
+            peek_sequential(queue, start, count)
+          end
+        end
 
         protected
 
         def pop_priority(queue)
-          # use zrevrange since we should order priority highest to lowest
           full_queue_name = "queue:#{queue}"
-          result = redis.zrevrange(full_queue_name, 0, 0)
+          result = redis.zrange(full_queue_name, 0, 0)
           job = result.nil? ? nil : result.first
 
           ret = decode(job)
-          redis.zrem full_queue_name, job
+          Resque.redis.zrem full_queue_name, job
           ret
         end
 
@@ -87,22 +93,40 @@ module Resque
           Resque.redis.zcard "queue:#{queue}"
         end
 
-        def sym_to_priority(sym)
-          if sym.is_a? Symbol
-            case sym
-              when :high
-                100
-              when :normal
-                50
-              when :low
-                0
-            end
-          elsif sym.is_a? Numeric
-            sym
+        def peek_priority(queue, start=0, count=1)
+          ret = Resque.redis.zrange("queue:#{queue}", start, start+count-1).map{ |job| decode(job) }
+
+          if count == 1 && !ret.nil?
+            ret.first
           else
-            sym.to_i rescue 0
+            ret
           end
           
+        end
+
+        # the priority value has to be a number between 0 and 1000
+        # for the queue to work right, the lower the number actually has to map to the higher priority, so
+        # we return 1000 minus the priority.  here we also convert certain symbols to numeric values
+        def clean_priority(sym)
+          
+          cleaned_priority = if sym.is_a? Symbol
+            case sym
+              when :highest
+                1000
+              when :normal
+                500
+              when :lowest
+                0
+              else
+                0
+            end
+          else
+            # make it an integer between 0 and 1000
+            [[sym.to_i, 1000].min, 0].max rescue 0
+          end
+
+          1000 - cleaned_priority
+
         end
 
         

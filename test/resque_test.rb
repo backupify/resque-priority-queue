@@ -20,22 +20,23 @@ class JobTest < Test::Unit::TestCase
   def test_push_with_priority
     job = { :class => SomePriorityJob, :args => [] }
 
-    Resque.push_with_priority(:priority_jobs, job, 5000)
+    Resque.push_with_priority(:priority_jobs, job, 75)
 
-    assert_equal "5000", Resque.redis.zscore('queue:priority_jobs', Resque.encode(job))
+    # we actually store 1000 minus the priority
+    assert_equal "925", Resque.redis.zscore('queue:priority_jobs', Resque.encode(job))
 
   end
 
   def test_push
     job = { :class => SomePriorityJob, :args => [] }
 
-    Resque.push_with_priority(:priority_jobs, job, 5000)
+    Resque.push_with_priority(:priority_jobs, job, 75)
 
     # subsequent pushes to this queue should work correctly and be given a default priority
     new_job = job.merge(:args => [ 'must', 'be', 'different'])
     Resque.push(:priority_jobs, new_job)
 
-    assert_equal "50", Resque.redis.zscore('queue:priority_jobs', Resque.encode(new_job))
+    assert_equal "500", Resque.redis.zscore('queue:priority_jobs', Resque.encode(new_job))
 
     # a regular push to a queue that hasn't been initialized with priority should be a normal set
     non_priority_job = { :class => SomeNonPriorityJob, :args => [] }
@@ -74,19 +75,63 @@ class JobTest < Test::Unit::TestCase
     assert_equal 9, Resque.size(:non_priority_jobs)
   end
 
-  def test_sym_to_priority
 
-    assert_equal 100, Resque.send(:sym_to_priority, :high)
-    assert_equal 50, Resque.send(:sym_to_priority, :normal)
-    assert_equal 0, Resque.send(:sym_to_priority, :low)
+  # stolen/modified from resque peek test
+  def test_peek_no_priority
+    Resque.push(:non_priority_jobs, { 'name' => 'chris' })
+    Resque.push(:non_priority_jobs, { 'name' => 'bob' })
+    Resque.push(:non_priority_jobs, { 'name' => 'mark' })
 
-    assert_equal 9999, Resque.send(:sym_to_priority, 9999)
-    assert_equal 7777, Resque.send(:sym_to_priority, '7777')
-    assert_equal 3.14, Resque.send(:sym_to_priority, 3.14)
-    assert_equal 6, Resque.send(:sym_to_priority, '6.28')
+    assert_equal({ 'name' => 'chris' }, Resque.peek(:non_priority_jobs))
 
-    assert_equal 0, Resque.send(:sym_to_priority, nil)
-    assert_equal 0, Resque.send(:sym_to_priority, Hash.new)
+
+
+    
+    assert_equal({ 'name' => 'bob' }, Resque.peek(:non_priority_jobs, 1, 1))
+
+    assert_equal([{ 'name' => 'bob' }, { 'name' => 'mark' }], Resque.peek(:non_priority_jobs, 1, 2))
+    assert_equal([{ 'name' => 'chris' }, { 'name' => 'bob' }], Resque.peek(:non_priority_jobs, 0, 2))
+    assert_equal([{ 'name' => 'chris' }, { 'name' => 'bob' }, { 'name' => 'mark' }], Resque.peek(:non_priority_jobs, 0, 3))
+    assert_equal({ 'name' => 'mark' }, Resque.peek(:non_priority_jobs, 2, 1))
+    assert_equal nil, Resque.peek(:non_priority_jobs, 3)
+    assert_equal [], Resque.peek(:non_priority_jobs, 3, 2)
+  end
+
+  # stolen/modified from resque peek test
+  def test_peek_with_priority
+    Resque.push_with_priority(:priority_jobs, { 'name' => 'chris' }, 100)
+    Resque.push_with_priority(:priority_jobs, { 'name' => 'bob' }, 50)
+    Resque.push_with_priority(:priority_jobs, { 'name' => 'mark' }, 49)
+
+    assert_equal({ 'name' => 'chris' }, Resque.peek(:priority_jobs))
+
+
+
+
+    assert_equal({ 'name' => 'bob' }, Resque.peek(:priority_jobs, 1, 1))
+
+    assert_equal([{ 'name' => 'bob' }, { 'name' => 'mark' }], Resque.peek(:priority_jobs, 1, 2))
+    assert_equal([{ 'name' => 'chris' }, { 'name' => 'bob' }], Resque.peek(:priority_jobs, 0, 2))
+    assert_equal([{ 'name' => 'chris' }, { 'name' => 'bob' }, { 'name' => 'mark' }], Resque.peek(:priority_jobs, 0, 3))
+    assert_equal({ 'name' => 'mark' }, Resque.peek(:priority_jobs, 2, 1))
+    assert_equal nil, Resque.peek(:priority_jobs, 3)
+    assert_equal [], Resque.peek(:priority_jobs, 3, 2)
+  end
+
+  def test_clean_priority
+    # reminder that we return 1000 minus the priority.  after the priority has been cleaned, a lower number is 'higher'
+
+    assert_equal 0, Resque.send(:clean_priority, :highest)
+    assert_equal 500, Resque.send(:clean_priority, :normal)
+    assert_equal 1000, Resque.send(:clean_priority, :low)
+
+    assert_equal 991, Resque.send(:clean_priority, 9)
+    assert_equal 923, Resque.send(:clean_priority, 77)
+    assert_equal 963, Resque.send(:clean_priority, 37)
+    assert_equal 906, Resque.send(:clean_priority, 94)
+
+    assert_equal 1000, Resque.send(:clean_priority, nil)
+    assert_equal 1000, Resque.send(:clean_priority, Hash.new)
 
   end
 
