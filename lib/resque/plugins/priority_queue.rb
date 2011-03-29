@@ -33,6 +33,10 @@ module Resque
 
       module ResqueMethods
 
+        def is_priority_queue?(queue)
+          redis.type("queue:#{queue}") == 'zset'
+        end
+
         def push_with_priority(queue, item, priority = :normal)
           watch_queue(queue)
           redis.zadd "queue:#{queue}", sym_to_priority(priority), encode(item)

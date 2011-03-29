@@ -4,6 +4,9 @@ class JobTest < Test::Unit::TestCase
 
   def setup
     Resque::Plugins::PriorityQueue.enable!
+
+    Resque.remove_queue(:priority_jobs)
+    Resque.remove_queue(:non_priority_jobs)
   end
 
   class ::SomePriorityJob
@@ -43,11 +46,11 @@ class JobTest < Test::Unit::TestCase
 
   def test_pop
     # pop should return elements from priority queues in decreasing order of priority
-    5.times { |i| Resque.push_with_priority(:priority_jobs_2, { :class => SomePriorityJob, :args => [ "#{i}" ] }, i) }
+    5.times { |i| Resque.push_with_priority(:priority_jobs, { :class => SomePriorityJob, :args => [ "#{i}" ] }, i) }
 
     last_priority = nil
     5.times do
-      job = Resque.pop(:priority_jobs_2)
+      job = Resque.pop(:priority_jobs)
       assert last_priority == nil || job['args'].first.to_i < last_priority
       last_priority = job['args'].first.to_i
     end
@@ -64,11 +67,11 @@ class JobTest < Test::Unit::TestCase
   def test_size
     # size should work with both zsets and lists
 
-    7.times { |i| Resque.push_with_priority(:priority_jobs_3, { :class => SomePriorityJob, :args => [ "#{i}" ] }, i) }
-    9.times { |i| Resque.push(:non_priority_jobs_3, { :class => SomeNonPriorityJob, :args => ["#{i}"] })}
+    7.times { |i| Resque.push_with_priority(:priority_jobs, { :class => SomePriorityJob, :args => [ "#{i}" ] }, i) }
+    9.times { |i| Resque.push(:non_priority_jobs, { :class => SomeNonPriorityJob, :args => ["#{i}"] })}
 
-    assert_equal 7, Resque.size(:priority_jobs_3)
-    assert_equal 9, Resque.size(:non_priority_jobs_3)
+    assert_equal 7, Resque.size(:priority_jobs)
+    assert_equal 9, Resque.size(:non_priority_jobs)
   end
 
   def test_sym_to_priority
@@ -84,6 +87,16 @@ class JobTest < Test::Unit::TestCase
 
     assert_equal 0, Resque.send(:sym_to_priority, nil)
     assert_equal 0, Resque.send(:sym_to_priority, Hash.new)
+
+  end
+
+  def test_is_priority_queue?
+
+    Resque.push_with_priority(:priority_jobs, { :class => SomePriorityJob, :args => [ ] })
+    Resque.push(:non_priority_jobs, { :class => SomeNonPriorityJob, :args => [ ] })
+
+    assert Resque.is_priority_queue?(:priority_jobs)
+    assert !Resque.is_priority_queue?(:non_priority_jobs)
 
   end
 
