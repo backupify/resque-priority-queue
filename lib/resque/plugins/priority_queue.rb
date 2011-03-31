@@ -86,8 +86,12 @@ module Resque
             case sym
               when :highest
                 1000
+              when :high
+                750
               when :normal
                 500
+              when :low
+                250
               when :lowest
                 0
               else

@@ -122,8 +122,10 @@ class JobTest < Test::Unit::TestCase
     # reminder that we return 1000 minus the priority.  after the priority has been cleaned, a lower number is 'higher'
 
     assert_equal 0, Resque.send(:clean_priority, :highest)
+    assert_equal 250, Resque.send(:clean_priority, :high)
     assert_equal 500, Resque.send(:clean_priority, :normal)
-    assert_equal 1000, Resque.send(:clean_priority, :low)
+    assert_equal 750, Resque.send(:clean_priority, :low)
+    assert_equal 1000, Resque.send(:clean_priority, :lowest)
 
     assert_equal 991, Resque.send(:clean_priority, 9)
     assert_equal 923, Resque.send(:clean_priority, 77)
