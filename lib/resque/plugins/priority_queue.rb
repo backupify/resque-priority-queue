@@ -45,8 +45,8 @@ module Resque
           redis.zadd "queue:#{queue}", clean_priority(priority), encode(item)
         end
 
-        def priority(queue, job_class, *args)
-          score = redis.zscore "queue:#{queue}", encode(:class => job_class.to_s, :args => args)
+        def priority(queue, job)
+          score = redis.zscore "queue:#{queue}", encode(job)
 
           score = 1000 - score.to_i unless score.nil?
 
@@ -165,6 +165,10 @@ module Resque
 
         # just calls create_with_priority, since zadd just does an update if the job already exists
         alias_method :create_or_update_priority, :create_with_priority
+
+        def priority(queue, klass, *args)
+          Resque.priority(queue, :class => klass.to_s, :args => args)
+        end        
 
       end
 

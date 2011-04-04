@@ -8,7 +8,7 @@ class JobTest < Test::Unit::TestCase
 
   class ::SomePriorityJob
 
-    def self.after_enqueue_do_something
+    def self.after_enqueue_do_something(*args)
       @did_something = true
     end
 
@@ -39,6 +39,12 @@ class JobTest < Test::Unit::TestCase
     Resque::Job.create_or_update_priority(:priority_jobs, SomePriorityJob, 975)
     # we store 1000 minus the priority
     assert_equal '25', Resque.redis.zscore("queue:priority_jobs", Resque.encode(:class => SomePriorityJob, :args => []))
+  end
+
+  def test_job_priority
+    Resque::Job.create_with_priority(:priority_jobs, SomePriorityJob, 77, 'asdf', 'jkl;')
+
+    assert_equal 77, Resque::Job.priority(:priority_jobs, SomePriorityJob, 'asdf', 'jkl;')
   end
 
 end
