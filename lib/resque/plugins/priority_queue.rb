@@ -46,6 +46,8 @@ module Resque
         end
 
         def priority(queue, job)
+          return nil if !is_priority_queue?(queue)
+
           score = redis.zscore "queue:#{queue}", encode(job)
 
           score = 1000 - score.to_i unless score.nil?

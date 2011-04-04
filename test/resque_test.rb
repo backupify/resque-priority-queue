@@ -152,6 +152,12 @@ class JobTest < Test::Unit::TestCase
     Resque.push_with_priority(:priority_jobs, job, 77)
 
     assert_equal 77, Resque.priority(:priority_jobs, job)
+
+    # make sure normal redis list doesn't throw an exception
+    other_job = { :class => SomeNonPriorityJob, :args => ['bye'] }
+    Resque.push(:non_priority_jobs, other_job)
+
+    assert_nil Resque.priority(:non_priority_jobs, other_job)
   end
 
   def test_priority_enabled?
