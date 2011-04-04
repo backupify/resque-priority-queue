@@ -147,4 +147,11 @@ class JobTest < Test::Unit::TestCase
 
   end
 
+  def test_priority
+    job = { :class => SomePriorityJob, :args => [ 'hi' ] }
+    Resque.push_with_priority(:priority_jobs, job, 77)
+
+    assert_equal 77, Resque.priority(:priority_jobs, job)
+  end
+
 end

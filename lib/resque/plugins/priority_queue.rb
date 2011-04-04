@@ -45,6 +45,13 @@ module Resque
           redis.zadd "queue:#{queue}", clean_priority(priority), encode(item)
         end
 
+        def priority(queue, job)
+          score = redis.zscore "queue:#{queue}", encode(job)
+          if score
+            1000 - score.to_i
+          end
+        end
+
         def _pop(queue)
           if is_priority_queue?(queue)
             pop_priority(queue)
