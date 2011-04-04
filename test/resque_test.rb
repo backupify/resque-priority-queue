@@ -154,4 +154,17 @@ class JobTest < Test::Unit::TestCase
     assert_equal 77, Resque.priority(:priority_jobs, job)
   end
 
+  def test_priority_enabled?
+    Resque.redis.del 'priority_queues'
+
+    Resque.redis.sadd 'priority_queues', 'good_queue'
+
+    assert !Resque.priority_enabled?('bad_queue')
+    assert !Resque.priority_enabled?(:bad_queue)
+
+    assert Resque.priority_enabled?('good_queue')
+    assert Resque.priority_enabled?(:good_queue)
+
+  end
+
 end

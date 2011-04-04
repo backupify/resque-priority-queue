@@ -52,6 +52,10 @@ module Resque
           end
         end
 
+        def priority_enabled?(queue)
+          redis.sismember 'priority_queues', queue.to_s
+        end
+
         def _pop(queue)
           if is_priority_queue?(queue)
             pop_priority(queue)
