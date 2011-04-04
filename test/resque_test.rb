@@ -148,10 +148,9 @@ class JobTest < Test::Unit::TestCase
   end
 
   def test_priority
-    job = { :class => SomePriorityJob, :args => [ 'hi' ] }
-    Resque.push_with_priority(:priority_jobs, job, 77)
+    Resque.push_with_priority(:priority_jobs, { :class => SomePriorityJob, :args => ['hi']}, 77)
 
-    assert_equal 77, Resque.priority(:priority_jobs, job)
+    assert_equal 77, Resque.priority(:priority_jobs, SomePriorityJob, 'hi')
   end
 
   def test_priority_enabled?

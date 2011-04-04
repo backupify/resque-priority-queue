@@ -45,11 +45,12 @@ module Resque
           redis.zadd "queue:#{queue}", clean_priority(priority), encode(item)
         end
 
-        def priority(queue, job)
-          score = redis.zscore "queue:#{queue}", encode(job)
-          if score
-            1000 - score.to_i
-          end
+        def priority(queue, job_class, *args)
+          score = redis.zscore "queue:#{queue}", encode(:class => job_class.to_s, :args => args)
+
+          score = 1000 - score.to_i unless score.nil?
+
+          score
         end
 
         def priority_enabled?(queue)
