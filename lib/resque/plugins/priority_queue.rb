@@ -154,8 +154,13 @@ module Resque
           Plugin.after_enqueue_hooks(klass).each do |hook|
             klass.send(hook, *args)
           end
+
           ret
         end
+
+        # just calls create_with_priority, since zadd just does an update if the job already exists
+        alias_method :create_or_update_priority, :create_with_priority
+
       end
 
     end
