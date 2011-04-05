@@ -114,7 +114,7 @@ module Resque
             when :lowest, 'lowest'
               0
             else
-              cleaned_priority = [[sym.to_i, 1000].min, 0].max rescue 0
+              [[sym.to_i, 1000].min, 0].max rescue 0
           end
 
           1000 - cleaned_priority
