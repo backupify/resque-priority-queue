@@ -35,7 +35,7 @@ module Resque
         Resque.after_fork do |job|
           job.payload_class.priority = job.priority if job.payload_class.respond_to?(:priority=)
 
-          old_after_fork(job) if old_after_fork
+          old_after_fork.call(job) if old_after_fork
         end
 
         @priority_queue_enabled = true
