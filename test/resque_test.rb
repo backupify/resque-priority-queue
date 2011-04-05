@@ -23,7 +23,7 @@ class JobTest < Test::Unit::TestCase
     Resque.push_with_priority(:priority_jobs, job, 75)
 
     # we actually store 1000 minus the priority
-    assert_equal "925", Resque.redis.zscore('queue:priority_jobs', Resque.encode(job.merge(:priority => 75)))
+    assert_equal "925", Resque.redis.zscore('queue:priority_jobs', Resque.encode(job))
 
   end
 
@@ -37,7 +37,7 @@ class JobTest < Test::Unit::TestCase
     Resque.push(:priority_jobs, new_job)
 
     # should also add priority to the job
-    assert_equal "500", Resque.redis.zscore('queue:priority_jobs', Resque.encode(new_job.merge(:priority => :normal)))
+    assert_equal "500", Resque.redis.zscore('queue:priority_jobs', Resque.encode(new_job))
 
     # a regular push to a queue that hasn't been initialized with priority should be a normal set
     non_priority_job = { :class => SomeNonPriorityJob, :args => [] }

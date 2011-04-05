@@ -58,7 +58,7 @@ module Resque
 
         def push_with_priority(queue, item, priority = :normal)
           watch_queue(queue)
-          redis.zadd "queue:#{queue}", clean_priority(priority), encode(item.merge(:priority => priority))
+          redis.zadd "queue:#{queue}", clean_priority(priority), encode(item)
         end
 
         def priority_enabled?(queue)
@@ -97,29 +97,24 @@ module Resque
           end
         end
 
-      # the priority value has to be a number between 0 and 1000
+        # the priority value has to be a number between 0 and 1000
         # for the queue to work right, the lower the number actually has to map to the higher priority, so
         # we return 1000 minus the priority.  here we also convert certain symbols to numeric values
         def clean_priority(sym)
 
-          cleaned_priority = if sym.is_a? Symbol
-            case sym
-              when :highest
-                1000
-              when :high
-                750
-              when :normal
-                500
-              when :low
-                250
-              when :lowest
-                0
-              else
-                0
-            end
-          else
-            # make it an integer between 0 and 1000
-            [[sym.to_i, 1000].min, 0].max rescue 0
+          cleaned_priority = case sym
+            when :highest, 'highest'
+              1000
+            when :high, 'high'
+              750
+            when :normal, 'normal'
+              500
+            when :low, 'low'
+              250
+            when :lowest, 'lowest'
+              0
+            else
+              cleaned_priority = [[sym.to_i, 1000].min, 0].max rescue 0
           end
 
           1000 - cleaned_priority
@@ -133,9 +128,11 @@ module Resque
           result = redis.zrange(full_queue_name, 0, 0)
           job = result.nil? ? nil : result.first
 
+          priority = redis.zscore full_queue_name, job
+
           ret = decode(job)
           Resque.redis.zrem full_queue_name, job
-          ret
+          ret.merge('priority' => priority)
         end
 
         def size_priority(queue)
@@ -179,7 +176,7 @@ module Resque
       module JobInstanceMethods
 
         def priority
-          @payload['priority'] if @payload
+          Resque.clean_priority(@payload['priority']) if @payload
         end
 
       end
