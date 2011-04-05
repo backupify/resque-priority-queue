@@ -33,7 +33,7 @@ module Resque
 
         old_after_fork = Resque.after_fork
         Resque.after_fork do |job|
-          job.payload_class.priority = job.payload['priority'] if job.payload_class.respond_to?(:priority=)
+          job.payload_class.priority = job.priority if job.payload_class.respond_to?(:priority=)
 
           old_after_fork(job) if old_after_fork
         end
