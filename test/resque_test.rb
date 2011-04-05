@@ -23,7 +23,7 @@ class JobTest < Test::Unit::TestCase
     Resque.push_with_priority(:priority_jobs, job, 75)
 
     # we actually store 1000 minus the priority
-    assert_equal "925", Resque.redis.zscore('queue:priority_jobs', Resque.encode(job))
+    assert_equal "925", Resque.redis.zscore('queue:priority_jobs', Resque.encode(job.merge(:priority => 75)))
 
   end
 
@@ -36,7 +36,8 @@ class JobTest < Test::Unit::TestCase
     new_job = job.merge(:args => [ 'must', 'be', 'different'])
     Resque.push(:priority_jobs, new_job)
 
-    assert_equal "500", Resque.redis.zscore('queue:priority_jobs', Resque.encode(new_job))
+    # should also add priority to the job
+    assert_equal "500", Resque.redis.zscore('queue:priority_jobs', Resque.encode(new_job.merge(:priority => :normal)))
 
     # a regular push to a queue that hasn't been initialized with priority should be a normal set
     non_priority_job = { :class => SomeNonPriorityJob, :args => [] }
@@ -82,17 +83,16 @@ class JobTest < Test::Unit::TestCase
     Resque.push(:non_priority_jobs, { 'name' => 'bob' })
     Resque.push(:non_priority_jobs, { 'name' => 'mark' })
 
-    assert_equal({ 'name' => 'chris' }, Resque.peek(:non_priority_jobs))
-
+    assert_equal 'chris', Resque.peek(:non_priority_jobs)['name']
 
 
     
-    assert_equal({ 'name' => 'bob' }, Resque.peek(:non_priority_jobs, 1, 1))
+    assert_equal 'bob', Resque.peek(:non_priority_jobs, 1, 1)['name']
 
-    assert_equal([{ 'name' => 'bob' }, { 'name' => 'mark' }], Resque.peek(:non_priority_jobs, 1, 2))
-    assert_equal([{ 'name' => 'chris' }, { 'name' => 'bob' }], Resque.peek(:non_priority_jobs, 0, 2))
-    assert_equal([{ 'name' => 'chris' }, { 'name' => 'bob' }, { 'name' => 'mark' }], Resque.peek(:non_priority_jobs, 0, 3))
-    assert_equal({ 'name' => 'mark' }, Resque.peek(:non_priority_jobs, 2, 1))
+    assert_equal ['bob', 'mark'], Resque.peek(:non_priority_jobs, 1, 2).collect{ |job| job['name']}
+    assert_equal ['chris', 'bob'], Resque.peek(:non_priority_jobs, 0, 2).collect{ |job| job['name']}
+    assert_equal ['chris', 'bob', 'mark'], Resque.peek(:non_priority_jobs, 0, 3).collect{ |job| job['name']}
+    assert_equal 'mark', Resque.peek(:non_priority_jobs, 2, 1)['name']
     assert_equal nil, Resque.peek(:non_priority_jobs, 3)
     assert_equal [], Resque.peek(:non_priority_jobs, 3, 2)
   end
@@ -103,17 +103,17 @@ class JobTest < Test::Unit::TestCase
     Resque.push_with_priority(:priority_jobs, { 'name' => 'bob' }, 50)
     Resque.push_with_priority(:priority_jobs, { 'name' => 'mark' }, 49)
 
-    assert_equal({ 'name' => 'chris' }, Resque.peek(:priority_jobs))
+    assert_equal 'chris', Resque.peek(:priority_jobs)['name']
 
 
 
 
-    assert_equal({ 'name' => 'bob' }, Resque.peek(:priority_jobs, 1, 1))
+    assert_equal 'bob', Resque.peek(:priority_jobs, 1, 1)['name']
 
-    assert_equal([{ 'name' => 'bob' }, { 'name' => 'mark' }], Resque.peek(:priority_jobs, 1, 2))
-    assert_equal([{ 'name' => 'chris' }, { 'name' => 'bob' }], Resque.peek(:priority_jobs, 0, 2))
-    assert_equal([{ 'name' => 'chris' }, { 'name' => 'bob' }, { 'name' => 'mark' }], Resque.peek(:priority_jobs, 0, 3))
-    assert_equal({ 'name' => 'mark' }, Resque.peek(:priority_jobs, 2, 1))
+    assert_equal ['bob', 'mark'], Resque.peek(:priority_jobs, 1, 2).collect{ |job| job['name']}
+    assert_equal ['chris','bob'], Resque.peek(:priority_jobs, 0, 2).collect{ |job| job['name']}
+    assert_equal ['chris', 'bob', 'mark'], Resque.peek(:priority_jobs, 0, 3).collect{ |job| job['name']}
+    assert_equal 'mark', Resque.peek(:priority_jobs, 2, 1)['name']
     assert_equal nil, Resque.peek(:priority_jobs, 3)
     assert_equal [], Resque.peek(:priority_jobs, 3, 2)
   end
@@ -145,19 +145,6 @@ class JobTest < Test::Unit::TestCase
     assert Resque.is_priority_queue?(:priority_jobs)
     assert !Resque.is_priority_queue?(:non_priority_jobs)
 
-  end
-
-  def test_resque_priority
-    job = { :class => SomePriorityJob, :args => [ 'hi' ] }
-    Resque.push_with_priority(:priority_jobs, job, 77)
-
-    assert_equal 77, Resque.priority(:priority_jobs, job)
-
-    # make sure normal redis list doesn't throw an exception
-    other_job = { :class => SomeNonPriorityJob, :args => ['bye'] }
-    Resque.push(:non_priority_jobs, other_job)
-
-    assert_nil Resque.priority(:non_priority_jobs, other_job)
   end
 
   def test_priority_enabled?

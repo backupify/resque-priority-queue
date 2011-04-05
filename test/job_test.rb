@@ -23,7 +23,7 @@ class JobTest < Test::Unit::TestCase
     Resque::Job.create_with_priority(:priority_jobs, SomePriorityJob, 75)
 
     # we actually store 1000 minus the priority
-    assert_equal "925", Resque.redis.zscore("queue:priority_jobs", Resque.encode(:class => 'SomePriorityJob', :args => []))
+    assert_equal "925", Resque.redis.zscore("queue:priority_jobs", Resque.encode(:class => 'SomePriorityJob', :args => [], :priority => 75))
 
     @worker.work(0)
 
@@ -34,17 +34,19 @@ class JobTest < Test::Unit::TestCase
     Resque::Job.create_or_update_priority(:priority_jobs, SomePriorityJob, 75)
 
     # we actually store 1000 minus the priority
-    assert_equal "925", Resque.redis.zscore("queue:priority_jobs", Resque.encode(:class => 'SomePriorityJob', :args => []))
+    assert_equal "925", Resque.redis.zscore("queue:priority_jobs", Resque.encode(:class => 'SomePriorityJob', :args => [], :priority => 75))
 
     Resque::Job.create_or_update_priority(:priority_jobs, SomePriorityJob, 975)
     # we store 1000 minus the priority
-    assert_equal '25', Resque.redis.zscore("queue:priority_jobs", Resque.encode(:class => SomePriorityJob, :args => []))
+    assert_equal '25', Resque.redis.zscore("queue:priority_jobs", Resque.encode(:class => SomePriorityJob, :args => [], :priority => 975))
   end
 
-  def test_job_priority
+  def test_job_instance_priority
     Resque::Job.create_with_priority(:priority_jobs, SomePriorityJob, 77, 'asdf', 'jkl;')
 
-    assert_equal 77, Resque::Job.priority(:priority_jobs, SomePriorityJob, 'asdf', 'jkl;')
+    job = Resque::Job.reserve(:priority_jobs)
+
+    assert_equal 77, job.priority
   end
 
 end

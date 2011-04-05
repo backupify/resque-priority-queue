@@ -28,8 +28,15 @@ module Resque
           extend self
         end
 
-        Resque::Job.send(:extend, JobMethods)
-        Resque::Job.send(:include, JobMethods)
+        Resque::Job.send(:extend, JobClassMethods)
+        Resque::Job.send(:include, JobInstanceMethods)
+
+        old_after_fork = Resque.after_fork
+        Resque.after_fork do |job|
+          job.payload_class.priority = job.payload['priority'] if job.payload_class.respond_to?(:priority=)
+
+          old_after_fork(job) if old_after_fork
+        end
 
         @priority_queue_enabled = true
       end
@@ -42,17 +49,7 @@ module Resque
 
         def push_with_priority(queue, item, priority = :normal)
           watch_queue(queue)
-          redis.zadd "queue:#{queue}", clean_priority(priority), encode(item)
-        end
-
-        def priority(queue, job)
-          return nil if !is_priority_queue?(queue)
-
-          score = redis.zscore "queue:#{queue}", encode(job)
-
-          score = 1000 - score.to_i unless score.nil?
-
-          score
+          redis.zadd "queue:#{queue}", clean_priority(priority), encode(item.merge(:priority => priority))
         end
 
         def priority_enabled?(queue)
@@ -150,7 +147,7 @@ module Resque
       end
 
 
-      module JobMethods
+      module JobClassMethods
         def create_with_priority(queue, klass, priority, *args)
 
           raise NoQueueError.new("Jobs must be placed onto a queue.") if !queue
@@ -168,9 +165,13 @@ module Resque
         # just calls create_with_priority, since zadd just does an update if the job already exists
         alias_method :create_or_update_priority, :create_with_priority
 
-        def priority(queue, klass, *args)
-          Resque.priority(queue, :class => klass.to_s, :args => args)
-        end        
+      end
+
+      module JobInstanceMethods
+
+        def priority
+          @payload['priority'] if @payload
+        end
 
       end
 
