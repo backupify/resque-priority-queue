@@ -2,6 +2,15 @@ module Resque
   module Plugins
     module PriorityQueue
 
+      def priority=(priority)
+        @priority=priority
+      end
+
+      def priority
+        @priority
+      end
+
+
       def self.enable!(options={})
         return if @priority_queue_enabled
 
