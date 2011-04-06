@@ -2,6 +2,12 @@ module Resque
   module Plugins
     module PriorityQueue
 
+      # the score is stored as the priority * multiplier + time.now.to_i, so that "ties" are handled correctly
+      PRIORITY_MULTIPLIER = (1e13).to_i
+
+      MIN_PRIORITY = 0
+      MAX_PRIORITY = 1000
+
       def priority=(priority)
         @priority=priority
       end
@@ -58,7 +64,7 @@ module Resque
 
         def push_with_priority(queue, item, priority = :normal)
           watch_queue(queue)
-          redis.zadd "queue:#{queue}", clean_priority(priority), encode(item)
+          redis.zadd "queue:#{queue}", calculate_job_score(priority), encode(item)
         end
 
         def priority_enabled?(queue)
@@ -104,7 +110,7 @@ module Resque
 
           cleaned_priority = case sym
             when :highest, 'highest'
-              1000
+              MAX_PRIORITY
             when :high, 'high'
               750
             when :normal, 'normal'
@@ -112,13 +118,18 @@ module Resque
             when :low, 'low'
               250
             when :lowest, 'lowest'
-              0
+              MIN_PRIORITY
             else
               [[sym.to_i, 1000].min, 0].max rescue 0
           end
 
-          1000 - cleaned_priority
+          MAX_PRIORITY - cleaned_priority
 
+        end
+
+        # given a job score (from the zset), returns { :priority => cleaned priority, :created_at => unix timestamp }
+        def job_score_parts(score)
+          { :priority => (score.to_i / PRIORITY_MULTIPLIER), :created_at => (score.to_i % PRIORITY_MULTIPLIER) }
         end
 
         protected
@@ -128,11 +139,11 @@ module Resque
           result = redis.zrange(full_queue_name, 0, 0)
           job = result.nil? ? nil : result.first
 
-          priority = redis.zscore full_queue_name, job
+          job_info = job_score_parts(redis.zscore(full_queue_name, job))
 
           ret = decode(job)
           Resque.redis.zrem full_queue_name, job
-          ret.merge('priority' => priority)
+          ret.merge('priority' => job_info[:priority], 'created_at' => job_info[:created_at])
         end
 
         def size_priority(queue)
@@ -148,6 +159,11 @@ module Resque
             ret
           end
           
+        end
+
+        # given a priority, calculate the final score to be used when adding the job to the queue zset
+        def calculate_job_score(priority)
+          (clean_priority(priority) * PRIORITY_MULTIPLIER) + Time.now.to_i
         end
         
       end

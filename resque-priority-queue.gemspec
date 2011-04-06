@@ -13,7 +13,7 @@ spec = Gem::Specification.new do |s|
   s.require_paths     = ['lib']
 
   s.add_dependency('resque', '>= 1.8.0')
-  s.add_development_dependency('test-unit')
+  s.add_development_dependency('test-unit', 'mocha')
 
   s.description       = <<-EOL
   resque-priority-queue gives the ability to assign priorities to individual jobs in resque

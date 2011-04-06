@@ -1,4 +1,5 @@
 require 'test/unit'
+require 'mocha'
 require 'resque'
 
 dir = File.dirname(File.expand_path(__FILE__))
