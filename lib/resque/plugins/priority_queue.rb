@@ -136,14 +136,21 @@ module Resque
 
         def pop_priority(queue)
           full_queue_name = "queue:#{queue}"
-          result = redis.zrange(full_queue_name, 0, 0)
-          job = result.nil? ? nil : result.first
+          job = nil
+          we_have_one = false
+          until we_have_one
+            result = redis.zrange(full_queue_name, 0, 0)
+            return if result.nil? or result.empty?
+            job = result.first
 
-          job_info = job_score_parts(redis.zscore(full_queue_name, job))
+            job_info = job_score_parts(redis.zscore(full_queue_name, job))
 
-          ret = decode(job)
-          Resque.redis.zrem full_queue_name, job
-          ret.merge('priority' => job_info[:priority], 'created_at' => job_info[:created_at])
+            # The job isn't ours because we saw it in the queue (multiple processes
+            # can do that); it only becomes our when we remove it from the queue (which
+            # at most one process can do).
+            we_have_one = job.nil? || Resque.redis.zrem(full_queue_name, job)
+          end
+          decode(job).merge('priority' => job_info[:priority], 'created_at' => job_info[:created_at])
         end
 
         def size_priority(queue)
