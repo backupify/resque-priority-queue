@@ -179,4 +179,22 @@ class JobTest < Test::Unit::TestCase
 
   end
 
+  def test_pull_race_condition
+    # pop should return elements from priority queues exactly once, even if
+    #     called by multiple consumers.
+    n = 10
+    n.times { |i| Resque.push_with_priority(:priority_jobs, { :class => SomePriorityJob, :args => [ "#{i}" ] }, i) }
+
+    last_priority = nil
+    threads = (0..2).map { Thread.new {
+      jobs = []
+      while j = Resque.pop(:priority_jobs)
+        jobs << j
+      end
+      jobs
+    } }
+    results = threads.map { |t| t.value }
+    assert_equal (0...n).map { |i| i.to_s }.join(','), results.flatten.map { |j| j['args'] }.flatten.sort.join(',')
+  end
+
 end
